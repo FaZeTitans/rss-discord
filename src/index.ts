@@ -1,4 +1,5 @@
 import {
+	ActivityType,
 	Client,
 	Collection,
 	Events,
@@ -61,6 +62,9 @@ client.once(Events.ClientReady, (readyClient) => {
 	console.log(
 		`📡 Check interval: ${CHECK_INTERVAL / 1000}s (${isDev ? 'dev' : 'prod'} mode)`,
 	);
+
+	// Set bot status
+	readyClient.user.setActivity('your feeds', { type: ActivityType.Watching });
 
 	// Start checking feeds periodically
 	setInterval(() => {

@@ -50,6 +50,7 @@ RSS Discord Bot lets you subscribe to any RSS or Atom feed and receive beautiful
 <td width="50%">
 
 ### Core Features
+
 - **Multi-feed subscriptions** per channel
 - **Keyword filtering** (include/exclude)
 - **Rate limiting** per feed
@@ -60,6 +61,7 @@ RSS Discord Bot lets you subscribe to any RSS or Atom feed and receive beautiful
 <td width="50%">
 
 ### Smart Features
+
 - **Auto-color** embeds by domain
 - **GitHub/GitLab buttons** auto-detected
 - **Duplicate detection** across feeds
@@ -72,34 +74,34 @@ RSS Discord Bot lets you subscribe to any RSS or Atom feed and receive beautiful
 
 ### Supported Platforms
 
-| Platform | Auto-Color | RSS Helper Command |
-|----------|:----------:|:------------------:|
-| YouTube  | 🔴 | `/youtube` |
-| Reddit   | 🟠 | `/reddit` |
-| GitHub   | 🟢 | - |
-| Twitter/X | ⚫ | - |
-| And 10+ more... | ✓ | - |
+| Platform        | Auto-Color | RSS Helper Command |
+| --------------- | :--------: | :----------------: |
+| YouTube         |     🔴     |     `/youtube`     |
+| Reddit          |     🟠     |     `/reddit`      |
+| GitHub          |     🟢     |         -          |
+| Twitter/X       |     ⚫     |         -          |
+| And 10+ more... |     ✓      |         -          |
 
 ---
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/subscribe <url>` | Subscribe to an RSS feed |
-| `/unsubscribe <id>` | Remove a subscription |
-| `/list [category]` | List all subscriptions |
-| `/edit <id>` | Edit subscription settings |
-| `/test <id>` | Force check a feed |
-| `/pause <id>` / `/resume <id>` | Pause or resume a feed |
-| `/status [id]` | View feed health status |
-| `/webhook <id>` | Configure custom webhook |
-| `/settings` | Server-wide settings |
-| `/stats [days]` | View analytics |
-| `/youtube <url>` | Get YouTube channel RSS URL |
-| `/reddit <subreddit>` | Get subreddit RSS URL |
-| `/export` / `/import` | Backup & restore subscriptions |
-| `/botstats` | Show bot statistics |
+| Command                        | Description                    |
+| ------------------------------ | ------------------------------ |
+| `/subscribe <url>`             | Subscribe to an RSS feed       |
+| `/unsubscribe <id>`            | Remove a subscription          |
+| `/list [category]`             | List all subscriptions         |
+| `/edit <id>`                   | Edit subscription settings     |
+| `/test <id>`                   | Force check a feed             |
+| `/pause <id>` / `/resume <id>` | Pause or resume a feed         |
+| `/status [id]`                 | View feed health status        |
+| `/webhook <id>`                | Configure custom webhook       |
+| `/settings`                    | Server-wide settings           |
+| `/stats [days]`                | View analytics                 |
+| `/youtube <url>`               | Get YouTube channel RSS URL    |
+| `/reddit <subreddit>`          | Get subreddit RSS URL          |
+| `/export` / `/import`          | Backup & restore subscriptions |
+| `/botstats`                    | Show bot statistics            |
 
 ---
 
@@ -122,6 +124,7 @@ docker run -d \
 ```
 
 Then deploy slash commands:
+
 ```bash
 docker exec rss-discord bun run deploy
 ```
@@ -151,12 +154,12 @@ volumes:
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|:--------:|-------------|
-| `DISCORD_TOKEN` | ✓ | Bot token from Discord Developer Portal |
-| `DISCORD_CLIENT_ID` | ✓ | Application client ID |
-| `NODE_ENV` | | Set to `production` for 5min check interval |
-| `DATABASE_PATH` | | Custom SQLite path (default: `/app/data/rss-bot.db`) |
+| Variable            | Required | Description                                          |
+| ------------------- | :------: | ---------------------------------------------------- |
+| `DISCORD_TOKEN`     |    ✓     | Bot token from Discord Developer Portal              |
+| `DISCORD_CLIENT_ID` |    ✓     | Application client ID                                |
+| `NODE_ENV`          |          | Set to `production` for 5min check interval          |
+| `DATABASE_PATH`     |          | Custom SQLite path (default: `/app/data/rss-bot.db`) |
 
 ### Unraid / Synology / Other Platforms
 
@@ -183,6 +186,7 @@ bun install
 ```
 
 Create `.env`:
+
 ```env
 DISCORD_TOKEN=your_bot_token
 DISCORD_CLIENT_ID=your_client_id
@@ -190,6 +194,7 @@ DISCORD_GUILD_ID=your_dev_guild_id  # For instant command updates
 ```
 
 Run:
+
 ```bash
 bun run deploy  # Deploy slash commands
 bun run dev     # Start with 30s check interval
@@ -207,15 +212,16 @@ docker build -t rss-discord .
 
 The bot requires these Discord permissions:
 
-| Permission | Reason |
-|------------|--------|
-| Send Messages | Post feed updates |
-| Embed Links | Rich embed formatting |
-| Attach Files | Export functionality |
-| Read Message History | Context for commands |
-| Manage Webhooks | Custom webhook feature |
+| Permission           | Reason                 |
+| -------------------- | ---------------------- |
+| Send Messages        | Post feed updates      |
+| Embed Links          | Rich embed formatting  |
+| Attach Files         | Export functionality   |
+| Read Message History | Context for commands   |
+| Manage Webhooks      | Custom webhook feature |
 
 **Invite URL:**
+
 ```
 https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=536988672&scope=bot%20applications.commands
 ```
@@ -225,6 +231,7 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=53
 ## Contributing
 
 Contributions are welcome! Feel free to:
+
 - Report bugs
 - Suggest features
 - Submit pull requests
