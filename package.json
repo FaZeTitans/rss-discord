@@ -1,0 +1,23 @@
+{
+	"name": "rss-discord",
+	"module": "src/index.ts",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "bun --watch src/index.ts",
+		"start": "bun src/index.ts",
+		"typecheck": "tsc --noEmit",
+		"deploy": "bun src/deploy-commands.ts"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"prettier": "^3.7.4"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"dependencies": {
+		"discord.js": "^14.25.1",
+		"rss-parser": "^3.13.0"
+	}
+}
