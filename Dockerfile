@@ -10,22 +10,14 @@ RUN bun install --frozen-lockfile --production
 FROM base AS runner
 ENV NODE_ENV=production
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 botuser
-
 # Copy dependencies and source
 COPY --from=deps /app/node_modules ./node_modules
-COPY --chown=botuser:nodejs . .
+COPY . .
 
 # Create data directory for SQLite
-RUN mkdir -p /app/data && chown botuser:nodejs /app/data
-
-USER botuser
+RUN mkdir -p /app/data
 
 # Database will be stored in /app/data
 ENV DATABASE_PATH=/app/data/rss-bot.db
-
-EXPOSE 3000
 
 CMD ["bun", "run", "src/index.ts"]
