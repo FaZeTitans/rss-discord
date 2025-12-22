@@ -20,7 +20,48 @@ import {
 	ButtonStyle,
 } from 'discord.js';
 
+// Discord API error codes that should not be retried
+const NON_RETRYABLE_ERROR_CODES = new Set([
+	10003, // Unknown Channel
+	10004, // Unknown Guild
+	10008, // Unknown Message
+	10013, // Unknown User
+	10015, // Unknown Webhook
+	50001, // Missing Access
+	50013, // Missing Permissions
+	50035, // Invalid Form Body
+]);
+
+// Retry helper with exponential backoff
+async function withRetry<T>(
+	fn: () => Promise<T>,
+	maxRetries: number = 3,
+	baseDelay: number = 1000,
+): Promise<T> {
+	let lastError: Error = new Error('Unknown error during retry');
+	for (let attempt = 0; attempt < maxRetries; attempt++) {
+		try {
+			return await fn();
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error));
+
+			// Check for Discord API error codes (don't retry permission/invalid errors)
+			const discordError = error as { code?: number };
+			if (discordError.code && NON_RETRYABLE_ERROR_CODES.has(discordError.code)) {
+				throw lastError;
+			}
+
+			if (attempt < maxRetries - 1) {
+				const delay = baseDelay * Math.pow(2, attempt);
+				await new Promise((resolve) => setTimeout(resolve, delay));
+			}
+		}
+	}
+	throw lastError;
+}
+
 const parser = new Parser({
+	timeout: 10000, // 10 second timeout to prevent hanging on unresponsive feeds
 	customFields: {
 		item: [
 			['media:content', 'mediaContent'],
@@ -400,25 +441,32 @@ async function sendFeedUpdate(
 			components.push(row);
 		}
 
-		// Send via webhook or regular channel
+		// Send via webhook or regular channel with retry logic
 		if (subscription.webhook_url) {
 			const webhook = new WebhookClient({ url: subscription.webhook_url });
-			await webhook.send({
-				content,
-				embeds: [embed],
-				components,
-				username: subscription.webhook_name || undefined,
-				avatarURL: subscription.webhook_avatar || undefined,
-			});
-			webhook.destroy();
+			try {
+				await withRetry(() =>
+					webhook.send({
+						content,
+						embeds: [embed],
+						components,
+						username: subscription.webhook_name || undefined,
+						avatarURL: subscription.webhook_avatar || undefined,
+					}),
+				);
+			} finally {
+				webhook.destroy();
+			}
 		} else {
 			const channel = await client.channels.fetch(subscription.channel_id);
 			if (!channel || !channel.isTextBased()) return;
-			await (channel as TextChannel).send({
-				content,
-				embeds: [embed],
-				components,
-			});
+			await withRetry(() =>
+				(channel as TextChannel).send({
+					content,
+					embeds: [embed],
+					components,
+				}),
+			);
 		}
 	} catch (error) {
 		console.error(

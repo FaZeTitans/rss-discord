@@ -8,6 +8,7 @@ import {
 } from 'discord.js';
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { checkFeeds } from './rss.ts';
+import { cleanOldHistory } from './database.ts';
 
 import * as subscribe from './commands/subscribe.ts';
 import * as list from './commands/list.ts';
@@ -29,6 +30,40 @@ import * as botstats from './commands/botstats.ts';
 // Check interval: 30s in development, 5min in production
 const isDev = process.env.NODE_ENV !== 'production';
 const CHECK_INTERVAL = isDev ? 30 * 1000 : 5 * 60 * 1000;
+const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+const HISTORY_RETENTION_DAYS = 30;
+
+// Flag to prevent concurrent feed checks
+let isCheckingFeeds = false;
+let isShuttingDown = false;
+
+// Wait for in-progress feed checks to complete before shutdown
+async function gracefulShutdown(signal: string): Promise<void> {
+	if (isShuttingDown) return;
+	isShuttingDown = true;
+
+	console.log(`📴 Received ${signal}, shutting down gracefully...`);
+
+	if (isCheckingFeeds) {
+		console.log('⏳ Waiting for feed check to complete...');
+		// Wait up to 30 seconds for the check to complete
+		const maxWait = 30000;
+		const checkInterval = 100;
+		let waited = 0;
+		while (isCheckingFeeds && waited < maxWait) {
+			await new Promise((resolve) => setTimeout(resolve, checkInterval));
+			waited += checkInterval;
+		}
+		if (isCheckingFeeds) {
+			console.log('⚠️ Feed check did not complete in time, forcing shutdown...');
+		} else {
+			console.log('✅ Feed check completed');
+		}
+	}
+
+	client.destroy();
+	process.exit(0);
+}
 
 interface Command {
 	data: { name: string };
@@ -66,9 +101,32 @@ client.once(Events.ClientReady, (readyClient) => {
 	// Set bot status
 	readyClient.user.setActivity('your feeds', { type: ActivityType.Watching });
 
-	// Start checking feeds periodically
+	// Clean old history on startup
+	const cleaned = cleanOldHistory(HISTORY_RETENTION_DAYS);
+	if (cleaned > 0) {
+		console.log(`🧹 Cleaned ${cleaned} old history entries`);
+	}
+
+	// Schedule periodic history cleanup (every 24 hours)
 	setInterval(() => {
-		checkFeeds(client);
+		const count = cleanOldHistory(HISTORY_RETENTION_DAYS);
+		if (count > 0) {
+			console.log(`🧹 Cleaned ${count} old history entries`);
+		}
+	}, CLEANUP_INTERVAL);
+
+	// Start checking feeds periodically with concurrency protection
+	setInterval(async () => {
+		if (isCheckingFeeds) {
+			console.log('⏳ Previous feed check still running, skipping...');
+			return;
+		}
+		isCheckingFeeds = true;
+		try {
+			await checkFeeds(client);
+		} finally {
+			isCheckingFeeds = false;
+		}
 	}, CHECK_INTERVAL);
 
 	// Initial check
@@ -105,5 +163,9 @@ if (!token) {
 	console.error('❌ DISCORD_TOKEN is not set in environment variables');
 	process.exit(1);
 }
+
+// Graceful shutdown handlers
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 client.login(token);

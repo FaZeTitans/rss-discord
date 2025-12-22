@@ -46,9 +46,18 @@ export async function execute(
 
 		const result = importSubscriptions(interaction.guildId!, data);
 
-		await interaction.editReply({
-			content: `📦 Import complete!\n✅ ${result.success} imported\n❌ ${result.failed} failed (duplicates or invalid)`,
-		});
+		let content = `📦 Import complete!\n✅ ${result.success} imported\n❌ ${result.failed} failed`;
+
+		// Show first 5 errors if any
+		if (result.errors.length > 0) {
+			const displayErrors = result.errors.slice(0, 5);
+			content += '\n\n**Errors:**\n' + displayErrors.map((e) => `• ${e}`).join('\n');
+			if (result.errors.length > 5) {
+				content += `\n... and ${result.errors.length - 5} more`;
+			}
+		}
+
+		await interaction.editReply({ content });
 	} catch (error) {
 		await interaction.editReply({
 			content: `❌ Failed to import: ${error instanceof Error ? error.message : 'Unknown error'}`,
