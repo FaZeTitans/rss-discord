@@ -348,11 +348,16 @@ export function importSubscriptions(
 			continue;
 		}
 
-		// Validate optional color format if provided
-		if (sub.color && !/^#?[0-9A-Fa-f]{6}$/.test(sub.color)) {
-			errors.push(`Entry ${i + 1}: invalid color format (expected hex)`);
-			failed++;
-			continue;
+		// Validate and normalize optional color format if provided
+		let normalizedColor: string | null = null;
+		if (sub.color) {
+			if (!/^#?[0-9A-Fa-f]{6}$/.test(sub.color)) {
+				errors.push(`Entry ${i + 1}: invalid color format (expected hex)`);
+				failed++;
+				continue;
+			}
+			// Normalize: remove '#' prefix if present for consistent storage
+			normalizedColor = sub.color.replace(/^#/, '').toUpperCase();
 		}
 
 		try {
@@ -361,7 +366,7 @@ export function importSubscriptions(
 				sub.channel_id,
 				sub.feed_url,
 				sub.feed_name || null,
-				sub.color || null,
+				normalizedColor,
 				sub.role_id || null,
 				sub.category || null,
 			);

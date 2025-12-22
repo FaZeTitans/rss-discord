@@ -20,28 +20,37 @@ import {
 	ButtonStyle,
 } from 'discord.js';
 
+// Discord API error codes that should not be retried
+const NON_RETRYABLE_ERROR_CODES = new Set([
+	10003, // Unknown Channel
+	10004, // Unknown Guild
+	10008, // Unknown Message
+	10013, // Unknown User
+	10015, // Unknown Webhook
+	50001, // Missing Access
+	50013, // Missing Permissions
+	50035, // Invalid Form Body
+]);
+
 // Retry helper with exponential backoff
 async function withRetry<T>(
 	fn: () => Promise<T>,
 	maxRetries: number = 3,
 	baseDelay: number = 1000,
 ): Promise<T> {
-	let lastError: Error | undefined;
+	let lastError: Error = new Error('Unknown error during retry');
 	for (let attempt = 0; attempt < maxRetries; attempt++) {
 		try {
 			return await fn();
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error));
-			// Don't retry on permission errors or invalid requests
-			const message = lastError.message.toLowerCase();
-			if (
-				message.includes('missing permissions') ||
-				message.includes('missing access') ||
-				message.includes('invalid') ||
-				message.includes('unknown channel')
-			) {
+
+			// Check for Discord API error codes (don't retry permission/invalid errors)
+			const discordError = error as { code?: number };
+			if (discordError.code && NON_RETRYABLE_ERROR_CODES.has(discordError.code)) {
 				throw lastError;
 			}
+
 			if (attempt < maxRetries - 1) {
 				const delay = baseDelay * Math.pow(2, attempt);
 				await new Promise((resolve) => setTimeout(resolve, delay));

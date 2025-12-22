@@ -35,6 +35,35 @@ const HISTORY_RETENTION_DAYS = 30;
 
 // Flag to prevent concurrent feed checks
 let isCheckingFeeds = false;
+let isShuttingDown = false;
+
+// Wait for in-progress feed checks to complete before shutdown
+async function gracefulShutdown(signal: string): Promise<void> {
+	if (isShuttingDown) return;
+	isShuttingDown = true;
+
+	console.log(`📴 Received ${signal}, shutting down gracefully...`);
+
+	if (isCheckingFeeds) {
+		console.log('⏳ Waiting for feed check to complete...');
+		// Wait up to 30 seconds for the check to complete
+		const maxWait = 30000;
+		const checkInterval = 100;
+		let waited = 0;
+		while (isCheckingFeeds && waited < maxWait) {
+			await new Promise((resolve) => setTimeout(resolve, checkInterval));
+			waited += checkInterval;
+		}
+		if (isCheckingFeeds) {
+			console.log('⚠️ Feed check did not complete in time, forcing shutdown...');
+		} else {
+			console.log('✅ Feed check completed');
+		}
+	}
+
+	client.destroy();
+	process.exit(0);
+}
 
 interface Command {
 	data: { name: string };
@@ -136,16 +165,7 @@ if (!token) {
 }
 
 // Graceful shutdown handlers
-process.on('SIGTERM', () => {
-	console.log('📴 Received SIGTERM, shutting down gracefully...');
-	client.destroy();
-	process.exit(0);
-});
-
-process.on('SIGINT', () => {
-	console.log('📴 Received SIGINT, shutting down gracefully...');
-	client.destroy();
-	process.exit(0);
-});
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 client.login(token);
