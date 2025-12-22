@@ -20,7 +20,39 @@ import {
 	ButtonStyle,
 } from 'discord.js';
 
+// Retry helper with exponential backoff
+async function withRetry<T>(
+	fn: () => Promise<T>,
+	maxRetries: number = 3,
+	baseDelay: number = 1000,
+): Promise<T> {
+	let lastError: Error | undefined;
+	for (let attempt = 0; attempt < maxRetries; attempt++) {
+		try {
+			return await fn();
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error));
+			// Don't retry on permission errors or invalid requests
+			const message = lastError.message.toLowerCase();
+			if (
+				message.includes('missing permissions') ||
+				message.includes('missing access') ||
+				message.includes('invalid') ||
+				message.includes('unknown channel')
+			) {
+				throw lastError;
+			}
+			if (attempt < maxRetries - 1) {
+				const delay = baseDelay * Math.pow(2, attempt);
+				await new Promise((resolve) => setTimeout(resolve, delay));
+			}
+		}
+	}
+	throw lastError;
+}
+
 const parser = new Parser({
+	timeout: 10000, // 10 second timeout to prevent hanging on unresponsive feeds
 	customFields: {
 		item: [
 			['media:content', 'mediaContent'],
@@ -400,25 +432,32 @@ async function sendFeedUpdate(
 			components.push(row);
 		}
 
-		// Send via webhook or regular channel
+		// Send via webhook or regular channel with retry logic
 		if (subscription.webhook_url) {
 			const webhook = new WebhookClient({ url: subscription.webhook_url });
-			await webhook.send({
-				content,
-				embeds: [embed],
-				components,
-				username: subscription.webhook_name || undefined,
-				avatarURL: subscription.webhook_avatar || undefined,
-			});
-			webhook.destroy();
+			try {
+				await withRetry(() =>
+					webhook.send({
+						content,
+						embeds: [embed],
+						components,
+						username: subscription.webhook_name || undefined,
+						avatarURL: subscription.webhook_avatar || undefined,
+					}),
+				);
+			} finally {
+				webhook.destroy();
+			}
 		} else {
 			const channel = await client.channels.fetch(subscription.channel_id);
 			if (!channel || !channel.isTextBased()) return;
-			await (channel as TextChannel).send({
-				content,
-				embeds: [embed],
-				components,
-			});
+			await withRetry(() =>
+				(channel as TextChannel).send({
+					content,
+					embeds: [embed],
+					components,
+				}),
+			);
 		}
 	} catch (error) {
 		console.error(

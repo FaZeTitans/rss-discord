@@ -60,12 +60,18 @@ db.run(`
     )
 `);
 
-// Create index for faster lookups
+// Create indexes for faster lookups
 db.run(
 	`CREATE INDEX IF NOT EXISTS idx_post_history_guild ON post_history(guild_id)`,
 );
 db.run(
 	`CREATE INDEX IF NOT EXISTS idx_post_history_link ON post_history(item_link)`,
+);
+db.run(
+	`CREATE INDEX IF NOT EXISTS idx_subscriptions_guild ON subscriptions(guild_id)`,
+);
+db.run(
+	`CREATE INDEX IF NOT EXISTS idx_subscriptions_active ON subscriptions(paused)`,
 );
 
 // Migrations for existing databases
@@ -313,16 +319,47 @@ export function exportSubscriptions(guildId: string): string {
 export function importSubscriptions(
 	guildId: string,
 	data: Partial<Subscription>[],
-): { success: number; failed: number } {
+): { success: number; failed: number; errors: string[] } {
 	let success = 0;
 	let failed = 0;
+	const errors: string[] = [];
 
-	for (const sub of data) {
+	for (let i = 0; i < data.length; i++) {
+		const sub = data[i];
+
+		// Validate required fields
+		if (!sub.channel_id || typeof sub.channel_id !== 'string') {
+			errors.push(`Entry ${i + 1}: missing or invalid channel_id`);
+			failed++;
+			continue;
+		}
+		if (!sub.feed_url || typeof sub.feed_url !== 'string') {
+			errors.push(`Entry ${i + 1}: missing or invalid feed_url`);
+			failed++;
+			continue;
+		}
+
+		// Validate URL format
+		try {
+			new URL(sub.feed_url);
+		} catch {
+			errors.push(`Entry ${i + 1}: invalid feed_url format`);
+			failed++;
+			continue;
+		}
+
+		// Validate optional color format if provided
+		if (sub.color && !/^#?[0-9A-Fa-f]{6}$/.test(sub.color)) {
+			errors.push(`Entry ${i + 1}: invalid color format (expected hex)`);
+			failed++;
+			continue;
+		}
+
 		try {
 			const added = addSubscription(
 				guildId,
-				sub.channel_id!,
-				sub.feed_url!,
+				sub.channel_id,
+				sub.feed_url,
 				sub.feed_name || null,
 				sub.color || null,
 				sub.role_id || null,
@@ -331,14 +368,18 @@ export function importSubscriptions(
 			if (added) {
 				success++;
 			} else {
+				errors.push(`Entry ${i + 1}: duplicate subscription`);
 				failed++;
 			}
-		} catch {
+		} catch (error) {
+			errors.push(
+				`Entry ${i + 1}: ${error instanceof Error ? error.message : 'unknown error'}`,
+			);
 			failed++;
 		}
 	}
 
-	return { success, failed };
+	return { success, failed, errors };
 }
 
 // Guild settings functions
