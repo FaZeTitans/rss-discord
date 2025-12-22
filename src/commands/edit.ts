@@ -50,6 +50,11 @@ export const data = new SlashCommandBuilder()
 			.setMinValue(0)
 			.setMaxValue(60),
 	)
+	.addBooleanOption((option) =>
+		option
+			.setName('use_regex')
+			.setDescription('Treat keywords as regular expressions'),
+	)
 	.setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels);
 
 export async function execute(
@@ -99,6 +104,9 @@ export async function execute(
 
 	const maxPosts = interaction.options.getInteger('max_posts_per_hour');
 	if (maxPosts !== null) updates.max_posts_per_hour = maxPosts || null;
+
+	const useRegex = interaction.options.getBoolean('use_regex');
+	if (useRegex !== null) updates.use_regex = useRegex ? 1 : 0;
 
 	if (Object.keys(updates).length === 0) {
 		await interaction.reply({

@@ -11,7 +11,10 @@ import {
 	getColorForDomain,
 	getGuildSettings,
 } from './database.ts';
+import { createLogger } from './logger.ts';
 import type { Client, TextChannel } from 'discord.js';
+
+const logger = createLogger('rss');
 import {
 	EmbedBuilder,
 	WebhookClient,
@@ -191,7 +194,9 @@ export async function checkSingleFeed(
 		const errorMessage =
 			error instanceof Error ? error.message : 'Unknown error';
 		updateFeedError(sub.id, errorMessage);
-		console.error(`Error checking feed ${sub.feed_url}:`, error);
+		logger.error(`Error checking feed ${sub.feed_url}`, error, {
+			subscriptionId: sub.id,
+		});
 		return { posted: false, error: errorMessage };
 	}
 }
@@ -200,21 +205,36 @@ function passesKeywordFilters(sub: Subscription, item: FeedItem): boolean {
 	const text =
 		`${item.title || ''} ${item.contentSnippet || item.content || ''}`.toLowerCase();
 
+	const useRegex = sub.use_regex === 1;
+
+	// Helper function to check if a pattern matches
+	const matchesPattern = (pattern: string, searchText: string): boolean => {
+		if (useRegex) {
+			try {
+				const regex = new RegExp(pattern, 'i');
+				return regex.test(searchText);
+			} catch {
+				// Invalid regex, fall back to literal match
+				logger.warn(`Invalid regex pattern: ${pattern}`, {
+					subscriptionId: sub.id,
+				});
+				return searchText.includes(pattern.toLowerCase());
+			}
+		}
+		return searchText.includes(pattern.toLowerCase());
+	};
+
 	// Check include keywords (at least one must match)
 	if (sub.include_keywords) {
-		const keywords = sub.include_keywords
-			.split(',')
-			.map((k) => k.trim().toLowerCase());
-		const hasMatch = keywords.some((keyword) => text.includes(keyword));
+		const patterns = sub.include_keywords.split(',').map((k) => k.trim());
+		const hasMatch = patterns.some((pattern) => matchesPattern(pattern, text));
 		if (!hasMatch) return false;
 	}
 
 	// Check exclude keywords (none must match)
 	if (sub.exclude_keywords) {
-		const keywords = sub.exclude_keywords
-			.split(',')
-			.map((k) => k.trim().toLowerCase());
-		const hasExcluded = keywords.some((keyword) => text.includes(keyword));
+		const patterns = sub.exclude_keywords.split(',').map((k) => k.trim());
+		const hasExcluded = patterns.some((pattern) => matchesPattern(pattern, text));
 		if (hasExcluded) return false;
 	}
 
@@ -469,10 +489,10 @@ async function sendFeedUpdate(
 			);
 		}
 	} catch (error) {
-		console.error(
-			`Error sending update to channel ${subscription.channel_id}:`,
-			error,
-		);
+		logger.error(`Error sending update to channel ${subscription.channel_id}`, error, {
+			subscriptionId: subscription.id,
+			channelId: subscription.channel_id,
+		});
 	}
 }
 
