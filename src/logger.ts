@@ -113,6 +113,10 @@ export function createLogger(context: string): Logger {
 	const level = (process.env.LOG_LEVEL || 'info') as LogLevel;
 	if (LOG_LEVELS[level] !== undefined) {
 		log.setLevel(level);
+	} else if (process.env.LOG_LEVEL) {
+		console.warn(
+			`Invalid LOG_LEVEL "${process.env.LOG_LEVEL}" provided. Falling back to "info".`,
+		);
 	}
 	return log;
 }

@@ -194,11 +194,25 @@ function runLegacyMigrations(): void {
 	logger.info('Migrating from legacy database schema...');
 
 	// Mark base migrations as executed (tables already exist)
-	const baseMigrations = [1, 2, 3, 4]; // subscriptions, guild_settings, post_history, indexes
-	for (const version of baseMigrations) {
-		const migration = migrations.find((m) => m.version === version);
-		if (migration) {
-			recordMigration(version, migration.name);
+	const existingTables = db
+		.query<{ name: string }, []>(
+			"SELECT name FROM sqlite_master WHERE type='table'"
+		)
+		.all();
+	const existingTableNames = new Set(existingTables.map((t) => t.name));
+
+	for (const migration of migrations) {
+		const upSource = migration.up.toString();
+		const match = upSource.match(
+			/CREATE TABLE(?: IF NOT EXISTS)?\s+["'`]?([A-Za-z0-9_]+)["'`]?/i,
+		);
+
+		// If this migration creates a table that already exists, treat it as a base migration
+		if (match) {
+			const tableName = match[1];
+			if (existingTableNames.has(tableName)) {
+				recordMigration(migration.version, migration.name);
+			}
 		}
 	}
 

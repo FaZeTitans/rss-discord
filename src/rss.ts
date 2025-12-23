@@ -215,9 +215,12 @@ function passesKeywordFilters(sub: Subscription, item: FeedItem): boolean {
 				return regex.test(searchText);
 			} catch {
 				// Invalid regex, fall back to literal match
-				logger.warn(`Invalid regex pattern: ${pattern}`, {
-					subscriptionId: sub.id,
-				});
+				logger.warn(
+					`Invalid regex pattern "${pattern}"; falling back to case-insensitive literal substring match.`,
+					{
+						subscriptionId: sub.id,
+					},
+				);
 				return searchText.includes(pattern.toLowerCase());
 			}
 		}
