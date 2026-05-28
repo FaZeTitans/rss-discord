@@ -16,6 +16,7 @@ import * as youtube from './commands/youtube.ts';
 import * as reddit from './commands/reddit.ts';
 import * as webhook from './commands/webhook.ts';
 import * as botstats from './commands/botstats.ts';
+import * as cleanup from './commands/cleanup.ts';
 
 const commands = [
 	subscribe.data.toJSON(),
@@ -34,6 +35,7 @@ const commands = [
 	reddit.data.toJSON(),
 	webhook.data.toJSON(),
 	botstats.data.toJSON(),
+	cleanup.data.toJSON(),
 ];
 
 const token = process.env.DISCORD_TOKEN;

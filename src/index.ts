@@ -26,6 +26,10 @@ import * as youtube from './commands/youtube.ts';
 import * as reddit from './commands/reddit.ts';
 import * as webhook from './commands/webhook.ts';
 import * as botstats from './commands/botstats.ts';
+import * as cleanup from './commands/cleanup.ts';
+import { createLogger } from './logger.ts';
+
+const logger = createLogger('bot');
 
 // Check interval: 30s in development, 5min in production
 const isDev = process.env.NODE_ENV !== 'production';
@@ -42,10 +46,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
 	if (isShuttingDown) return;
 	isShuttingDown = true;
 
-	console.log(`📴 Received ${signal}, shutting down gracefully...`);
+	logger.info(`Received ${signal}, shutting down gracefully...`);
 
 	if (isCheckingFeeds) {
-		console.log('⏳ Waiting for feed check to complete...');
+		logger.info('Waiting for feed check to complete...');
 		// Wait up to 30 seconds for the check to complete
 		const maxWait = 30000;
 		const checkInterval = 100;
@@ -55,9 +59,9 @@ async function gracefulShutdown(signal: string): Promise<void> {
 			waited += checkInterval;
 		}
 		if (isCheckingFeeds) {
-			console.log('⚠️ Feed check did not complete in time, forcing shutdown...');
+			logger.warn('Feed check did not complete in time, forcing shutdown...');
 		} else {
-			console.log('✅ Feed check completed');
+			logger.info('Feed check completed');
 		}
 	}
 
@@ -91,12 +95,13 @@ commands.set(youtube.data.name, youtube);
 commands.set(reddit.data.name, reddit);
 commands.set(webhook.data.name, webhook);
 commands.set(botstats.data.name, botstats);
+commands.set(cleanup.data.name, cleanup);
 
 client.once(Events.ClientReady, (readyClient) => {
-	console.log(`✅ Logged in as ${readyClient.user.tag}`);
-	console.log(
-		`📡 Check interval: ${CHECK_INTERVAL / 1000}s (${isDev ? 'dev' : 'prod'} mode)`,
-	);
+	logger.info(`Logged in as ${readyClient.user.tag}`);
+	logger.info(`Check interval: ${CHECK_INTERVAL / 1000}s`, {
+		mode: isDev ? 'development' : 'production',
+	});
 
 	// Set bot status
 	readyClient.user.setActivity('your feeds', { type: ActivityType.Watching });
@@ -104,21 +109,21 @@ client.once(Events.ClientReady, (readyClient) => {
 	// Clean old history on startup
 	const cleaned = cleanOldHistory(HISTORY_RETENTION_DAYS);
 	if (cleaned > 0) {
-		console.log(`🧹 Cleaned ${cleaned} old history entries`);
+		logger.info(`Cleaned ${cleaned} old history entries`);
 	}
 
 	// Schedule periodic history cleanup (every 24 hours)
 	setInterval(() => {
 		const count = cleanOldHistory(HISTORY_RETENTION_DAYS);
 		if (count > 0) {
-			console.log(`🧹 Cleaned ${count} old history entries`);
+			logger.info(`Cleaned ${count} old history entries`);
 		}
 	}, CLEANUP_INTERVAL);
 
 	// Start checking feeds periodically with concurrency protection
 	setInterval(async () => {
 		if (isCheckingFeeds) {
-			console.log('⏳ Previous feed check still running, skipping...');
+			logger.debug('Previous feed check still running, skipping...');
 			return;
 		}
 		isCheckingFeeds = true;
@@ -139,14 +144,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
 	const command = commands.get(interaction.commandName);
 
 	if (!command) {
-		console.error(`No command matching ${interaction.commandName} was found.`);
+		logger.warn(`No command matching ${interaction.commandName} was found`);
 		return;
 	}
 
 	try {
 		await command.execute(interaction);
 	} catch (error) {
-		console.error(error);
+		logger.error(`Error executing command ${interaction.commandName}`, error);
 		const content = '❌ There was an error while executing this command!';
 
 		if (interaction.replied || interaction.deferred) {
@@ -160,7 +165,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 const token = process.env.DISCORD_TOKEN;
 
 if (!token) {
-	console.error('❌ DISCORD_TOKEN is not set in environment variables');
+	logger.error('DISCORD_TOKEN is not set in environment variables');
 	process.exit(1);
 }
 

@@ -50,6 +50,11 @@ export const data = new SlashCommandBuilder()
 			.setMinValue(0)
 			.setMaxValue(60),
 	)
+	.addBooleanOption((option) =>
+		option
+			.setName('use_regex')
+			.setDescription('Treat keywords as regular expressions'),
+	)
 	.setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels);
 
 export async function execute(
@@ -99,6 +104,37 @@ export async function execute(
 
 	const maxPosts = interaction.options.getInteger('max_posts_per_hour');
 	if (maxPosts !== null) updates.max_posts_per_hour = maxPosts || null;
+
+	const useRegex = interaction.options.getBoolean('use_regex');
+
+	// When enabling regex mode, validate the effective keyword patterns.
+	if (useRegex === true) {
+		const effectiveInclude =
+			includeKeywords !== null ? includeKeywords || null : (sub as any).include_keywords;
+		const effectiveExclude =
+			excludeKeywords !== null ? excludeKeywords || null : (sub as any).exclude_keywords;
+
+		const patternsToValidate: { field: string; value: string | null | undefined }[] = [
+			{ field: 'include_keywords', value: effectiveInclude },
+			{ field: 'exclude_keywords', value: effectiveExclude },
+		];
+
+		for (const { field, value } of patternsToValidate) {
+			if (value) {
+				try {
+					// eslint-disable-next-line no-new
+					new RegExp(value);
+				} catch {
+					await interaction.reply({
+						content: `❌ Invalid regular expression in \`${field}\`: \`${value}\`.`,
+						flags: MessageFlags.Ephemeral,
+					});
+					return;
+				}
+			}
+		}
+	}
+	if (useRegex !== null) updates.use_regex = useRegex ? 1 : 0;
 
 	if (Object.keys(updates).length === 0) {
 		await interaction.reply({
